@@ -1,4 +1,10 @@
 ---
+  - name: Configuration | install python mysql connector
+    pip: name=MySQL-python state=present
+    become: yes
+    tags:
+      - mysql
+
   - name: Configuration | Create databases
     mysql_db:
       name: "{{ item.name }}"
@@ -22,7 +28,7 @@
       append_privs: "{{ item.append_privs | default('no') }}"
       login_host: "{{mysql_host | default('localhost')}}"
       login_user: "{{mysql_root_user | default('root')}}"
-      login_password: "{{mysql_root_password | default('devroot')}}"      
+      login_password: "{{mysql_root_password | default('devroot')}}"
     with_items: "{{ mysql_users | default([]) }}"
     no_log: true
     tags:
