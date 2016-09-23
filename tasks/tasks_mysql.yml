@@ -46,6 +46,7 @@
   - name: MySQL | Restart
     service: name=mysql state=restarted
 #    when: mysql_conf.changed
+    when: docker_test is not defined
     become: yes
     tags:
       - mysql
