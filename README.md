@@ -9,7 +9,7 @@ Example of usage (all parameters are optional)
 
 Simple
 
-```
+```YAML
   roles:
     - {
         role: "sa-mysql"
@@ -18,7 +18,7 @@ Simple
 
 Advanced:
 
-```
+```YAML
   roles:
     - {
         role: "sa-mysql",
@@ -36,10 +36,15 @@ Advanced:
       }
 ```
 
-Note: if you ever needed to downgrade mysql on xenial to 5.6 rather than default 5.7 available now - follow this dirty path:
+Note: if you ever needed to downgrade mysql on xenial to 5.6 rather than default 5.7 available now - use this replacement role `sa-mysql56`:
 
-https://gist.github.com/Voronenko/31161ab292c7967fcd38c092335a99e1
+https://github.com/softasap/sa-mysql56
 
-If there will be demand, I will include it into provisioning magic.  At present moment I had one request only.
 
+Copyright and license
+---------------------
+
+Code is dual licensed under the [BSD 3 clause] (https://opensource.org/licenses/BSD-3-Clause) and the [MIT License] (http://opensource.org/licenses/MIT). Choose the one that suits you best.
+
+Subscribe for roles updates at [FB] (https://www.facebook.com/SoftAsap/)
 
