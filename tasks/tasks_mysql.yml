@@ -27,13 +27,6 @@
     become: yes
     tags:
       - mysql
-  # - name: MySQL | Copy configuration file
-  #   copy: src={{root_dir}}/files/mysql/my.cnf dest=/etc/mysql/my.cnf backup=yes
-  #   when: ansible_os_family == "Debian"
-  #   register: mysql_conf
-  #   tags:
-  #    - mysql
-  #   become: yes
 
   - name: MySQL | install libmysqlclient-dev
     apt: name=libmysqlclient-dev update_cache=yes state=latest
@@ -42,7 +35,6 @@
     tags:
       - mysql
 
-
   - name: MySQL | Restart
     service: name=mysql state=restarted
 #    when: mysql_conf.changed
@@ -50,3 +42,4 @@
     become: yes
     tags:
       - mysql
+

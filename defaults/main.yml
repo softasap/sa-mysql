@@ -1,6 +1,8 @@
 ---
 # defaults file for sa-mysql
 
+  option_harden_mysql: true
+
   mysql_root_user: root
   mysql_root_password: devroot
 

@@ -22,6 +22,7 @@ Advanced:
   roles:
     - {
         role: "sa-mysql",
+        option_harden_mysql: true,  
         mysql_root_user: root,
         mysql_root_password: devroot,
       - mysql_databases:
@@ -39,6 +40,30 @@ Advanced:
 Note: if you ever needed to downgrade mysql on xenial to 5.6 rather than default 5.7 available now - use this replacement role `sa-mysql56`:
 
 https://github.com/softasap/sa-mysql56
+
+
+Usage with ansible galaxy workflow
+----------------------------------
+
+If you installed the sa-mysql role using the command
+
+
+`
+   ansible-galaxy install softasap.sa-mysql
+`
+
+the role will be available in the folder library/softasap.sa-mysql-percona
+Please adjust the path accordingly.
+
+```YAML
+
+     - {
+         role: "softasap.sa-mysql"
+       }
+
+```
+
+
 
 
 Copyright and license
