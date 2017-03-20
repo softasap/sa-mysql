@@ -52,7 +52,7 @@ If you installed the sa-mysql role using the command
    ansible-galaxy install softasap.sa-mysql
 `
 
-the role will be available in the folder library/softasap.sa-mysql-percona
+the role will be available in the folder library/softasap.sa-mysql
 Please adjust the path accordingly.
 
 ```YAML
