@@ -9,3 +9,6 @@
   - include: tasks_mysql_cfg_patch.yml
 
   - include: tasks_dbs_configure.yml
+
+  - include: tasks_console_helper.yml
+
