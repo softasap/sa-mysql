@@ -63,6 +63,13 @@ Please adjust the path accordingly.
 
 ```
 
+requirements.yml snippet: 
+
+```YAML
+- src: softasap.sa-mysql
+  name: sa-mysql
+```
+
 
 
 
