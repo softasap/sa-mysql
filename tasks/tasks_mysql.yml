@@ -19,7 +19,7 @@
     become: yes
     tags:
       - mysql
-
+      - skip_ansible_lint
 
   - name: MySQL | Install
     apt: update-cache=yes force=yes state=present pkg=mysql-server

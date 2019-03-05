@@ -12,7 +12,7 @@
     become: yes
 
   - name: Mysql | Patch optional settings /etc/my.cnf
-    lineinfile: 
+    lineinfile:
         dest: /etc/mysql/my.cnf
         regexp: "{{ item.regexp }}"
         line: "{{ item.line }}"
