@@ -1,7 +1,7 @@
 ---
 # defaults file for sa-mysql
 
-  role_dir: "{{role_path}}"
+  role_dir: "{{ role_path }}"
 
   option_harden_mysql: true
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-MYSQL_ROOT_PASSWORD=devroot
+# possibility to override root password from environment, if needed
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-{{ mysql_root_password }}}
 
 SECURE_MYSQL=$(expect -c "
 set timeout 10

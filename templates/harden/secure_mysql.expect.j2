@@ -5,7 +5,7 @@ set timeout -1
 spawn $env(SHELL)
 match_max 100000
 expect -exact "Enter current password for root (enter for none):"
-send -- "{{mysql_root_password}}\r"
+send -- "{{ mysql_root_password }}\r"
 expect {
  -ex "VALIDATE PASSWORD PLUGIN can be used to test passwords" {
         send "n\n";
