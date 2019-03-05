@@ -24,8 +24,8 @@ platforms:
     #     auto_config: true
   # - name: centos6
   #   box: centos/6    
-  - name: centos7
-    box: centos/7
+  #- name: centos7
+  #  box: centos/7
   # - name: fedora28
   #   box: generic/fedora28
   # - name: alpine
