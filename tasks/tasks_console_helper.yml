@@ -1,15 +1,18 @@
 ---
 
-  - name: MySQL | Install colorer grc
+  - name: Mysql | Install colorer grc
     package: name="grc" state="present"
+    retries: 3
+    register: result
+    until: not result is failed
     become: yes
     tags: mysql
 
-  - name: MySQL | Template colorer to current user
-    template: src="{{role_dir}}/templates/grcat.mysql" dest="~/grcat.mysql"
-    tags: psql
+  - name: Mysql | Template colorer to current user
+    template: src="{{ role_dir }}/templates/grcat.mysql" dest="~/grcat.mysql"
+    tags: mysql
 
-  - name: MySql | mysql.cnf to current user
-    template: src="{{role_dir}}/templates/my.cnf.j2" dest="~/.my.cnf"
-    tags: psql
+  - name: Mysql | mysql.cnf to current user
+    template: src="{{ role_dir }}/templates/my.cnf.j2" dest="~/.my.cnf"
+    tags: mysql
 
