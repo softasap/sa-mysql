@@ -67,8 +67,8 @@
         - libssl-dev
         - libffi-dev
       when: ansible_os_family == 'Debian'
-        and ansible_python_version | version_compare('2.6.0', '>=')
-        and ansible_python_version | version_compare('2.7.9', '<')
+        and ansible_python_version is version('2.6.0', '>=')
+        and ansible_python_version is version('2.7.9', '<')
       become: yes
       tags:
         -python
@@ -83,8 +83,8 @@
         - ndg-httpsclient
         - pyasn1
       when: ansible_os_family == 'Debian'
-        and ansible_python_version | version_compare('2.6.0', '>=')
-        and ansible_python_version | version_compare('2.7.9', '<')
+        and ansible_python_version is version('2.6.0', '>=')
+        and ansible_python_version is version('2.7.9', '<')
       become: yes
       tags:
         -python
