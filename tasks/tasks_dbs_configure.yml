@@ -25,6 +25,10 @@
     # plain-password branch still hardcodes it (gated < 9.7 upstream).
     plugin: "{{ item.plugin | default('caching_sha2_password') }}"
     plugin_auth_string: "{{ item.password }}"
+    # on_create: caching_sha2_password re-salts on every comparison, so
+    # re-running with the same plaintext always "changes" - set the
+    # password only when the account is created; re-runs manage privs.
+    update_password: "{{ item.update_password | default('on_create') }}"
     priv: "{{ item.priv | default('*.*:USAGE') }}"
     state: "{{ item.state | default('present') }}"
     append_privs: "{{ item.append_privs | default(false) }}"
