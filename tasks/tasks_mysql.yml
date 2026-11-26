@@ -36,6 +36,16 @@
       {{ mysql_series_components.keys() | list | join(', ') }}.
       Set mysql_apt_component explicitly to override.
 
+- name: MYSQL | Validate root password is option-file safe
+  ansible.builtin.assert:
+    that:
+      - mysql_root_password is not search('[#;]')
+      - mysql_root_password | length > 0
+    fail_msg: >-
+      mysql_root_password must not contain '#' or ';' - MySQL option
+      files (/root/.my.cnf) treat them as comment starters, which
+      silently truncates the password and breaks client logins.
+
 - name: MYSQL | Check if server binary is already present
   ansible.builtin.command:
     # absolute path - sbin is not always on the non-login PATH

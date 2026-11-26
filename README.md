@@ -32,7 +32,7 @@ Full parameter list (all optional):
 | `mysql_apt_component` | derived    | Override the repo.mysql.com apt component directly      |
 | `mysql_state`         | `latest`   | Package state (`latest` tracks the enabled series)      |
 | `mysql_root_user`     | `root`     | Administrative user                                     |
-| `mysql_root_password` | `Devroot#1` | Root password ("development root"; must satisfy validate_password MEDIUM on EL — preseeded via debconf on Debian, temp-password ALTER on EL) |
+| `mysql_root_password` | `Devroot1!` | Root password ("development root"; must satisfy validate_password MEDIUM on EL and must not contain `#`/`;` — option files treat them as comments — preseeded via debconf on Debian, temp-password ALTER on EL) |
 | `option_harden_mysql` | `true`     | Remove anonymous users, remote root, test database      |
 | `mysql_mysqld_settings`| `{}`      | Rendered into `/etc/mysql/mysql.conf.d/99-sa-mysql.cnf` |
 | `mysql_databases`     | `[]`       | Databases to create                                     |
