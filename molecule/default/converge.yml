@@ -1,0 +1,36 @@
+---
+- name: Converge
+  hosts: all
+
+  pre_tasks:
+    - name: Display role under test
+      ansible.builtin.debug:
+        var: role_under_test
+
+    - name: Pre tasks debug
+      ansible.builtin.debug:
+        msg: "Pre tasks section for {{ ansible_host }}"
+
+    - name: Set default facts
+      ansible.builtin.set_fact:
+        remote_ip_address: "{{ ansible_host }}"
+
+    - name: Include default vars
+      ansible.builtin.include_vars:
+        file: "vars/molecule_vars.yml"
+
+  tasks:
+    - name: Apply role under test
+      ansible.builtin.include_role:
+        name: "{{ role_under_test }}"
+      vars:
+        # Acceptance: application database + user, verified by a real
+        # credential login in verify.yml. Password must satisfy the
+        # validate_password MEDIUM policy Oracle ships on EL.
+        mysql_databases:
+          - name: app
+        mysql_users:
+          - name: app
+            host: "localhost"
+            password: App#2026
+            priv: "app.*:ALL"

@@ -1,2 +1,16 @@
 ---
 # vars file for sa-mysql
+
+# repo.mysql.com apt component per MySQL series (X.Y).
+# LTS series carry an -lts suffix in the repo layout, 8.0 does not.
+mysql_series_components:
+  "8.0": mysql-8.0
+  "8.4": mysql-8.4-lts
+  "9.7": mysql-9.7-lts
+
+# repo.mysql.com yum repository per MySQL series (X.Y).
+mysql_series_yum_repos:
+  "8.0": mysql-8.0-community
+  "8.4": mysql-8.4-community
+  "9.7": mysql-9.7-community
+  "innovation": mysql-innovation-community

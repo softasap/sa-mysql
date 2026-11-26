@@ -1,14 +1,17 @@
 ---
 # tasks file for sa-mysql
 
-  - include: tasks_mysql.yml
+- name: MYSQL | Install server from repo.mysql.com
+  ansible.builtin.include_tasks: tasks_mysql.yml
 
-  - include: tasks_mysql_harden.yml
-    when: option_harden_mysql
+- name: MYSQL | Harden default installation
+  ansible.builtin.include_tasks: tasks_mysql_harden.yml
+  when:
+    - option_harden_mysql | bool
+    - docker_test is not defined
 
-  - include: tasks_mysql_cfg_patch.yml
+- name: MYSQL | Configure databases and users
+  ansible.builtin.include_tasks: tasks_dbs_configure.yml
 
-  - include: tasks_dbs_configure.yml
-
-  - include: tasks_console_helper.yml
-
+- name: MYSQL | Install console helper for the ansible user
+  ansible.builtin.include_tasks: tasks_console_helper.yml

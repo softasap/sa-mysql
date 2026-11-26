@@ -1,51 +1,302 @@
 ---
-  # Parameters:
-  #  mysql_root_password
+# Installs MySQL from the official repo.mysql.com repositories:
+#   Debian/Ubuntu -> apt (deb822), EL 8/9/10 -> yum/dnf.
+#
+# Release selection (defaults/main.yml):
+#   mysql_release: lts + mysql_lts_family: "8"|"9" -> newest 8.4 LTS / 9.7 LTS
+#   mysql_release: innovation                        -> current innovation series
+#   mysql_release: "8.4" / "9.7"                     -> concrete series, latest
+#   mysql_release: "8.4.13"                          -> pinned version (glob)
 
-  - name: MySQL | Check if is installed
-    command: test -x /usr/bin/mysql
-    when: ansible_system == "Linux"
-    register: mysql_present
-    ignore_errors: yes
-    tags:
-      - mysql
+- name: MYSQL | Resolve target series from mysql_release
+  ansible.builtin.set_fact:
+    mysql_target_series: >-
+      {{ '8.4' if mysql_release == 'lts' and mysql_lts_family | int == 8
+         else '9.7' if mysql_release == 'lts' and mysql_lts_family | int == 9
+         else mysql_release.split('.')[0:2] | join('.') }}
+    mysql_version_pinned: "{{ mysql_release.split('.') | length >= 3 }}"
 
-  - name: MySQL | Preset root password
-    shell: echo mysql-server-5.5 mysql-server/{{ item }} password {{ mysql_root_password }} | debconf-set-selections
-    when: ansible_os_family == "Debian" and mysql_present is failed
-    with_items:
-      - "root_password"
-      - "root_password_again"
-    become: yes
-    tags:
-      - mysql
-      - skip_ansible_lint
+- name: MYSQL | Resolve repository component
+  ansible.builtin.set_fact:
+    mysql_resolved_component: >-
+      {{ 'mysql-innovation' if mysql_release == 'innovation'
+         else mysql_series_components[mysql_target_series] | default('') }}
+    mysql_resolved_yum_repo: >-
+      {{ 'mysql-innovation-community' if mysql_release == 'innovation'
+         else mysql_series_yum_repos[mysql_target_series] | default('') }}
 
-  - name: MySQL | Install
-    apt: update-cache=yes force=yes state=present pkg=mysql-server
-    retries: 3
-    register: result
-    until: not result is failed
-    when: ansible_os_family == "Debian" and mysql_present is failed
-    become: yes
-    tags:
-      - mysql
+- name: MYSQL | Validate release selection
+  ansible.builtin.assert:
+    that:
+      - mysql_apt_component | length > 0
+      - mysql_resolved_yum_repo | length > 0
+    fail_msg: >-
+      Cannot resolve repo.mysql.com repository for mysql_release='{{ mysql_release }}'
+      (family {{ mysql_lts_family }}). Supported series:
+      {{ mysql_series_components.keys() | list | join(', ') }}.
+      Set mysql_apt_component explicitly to override.
 
-  - name: MySQL | install libmysqlclient-dev
-    apt: name=libmysqlclient-dev update_cache=yes state=present
-    retries: 3
-    register: result
-    until: not result is failed
-    when: ansible_os_family == "Debian" and mysql_present is failed
-    become: yes
-    tags:
-      - mysql
+- name: MYSQL | Check if server binary is already present
+  ansible.builtin.command:
+    # absolute path - sbin is not always on the non-login PATH
+    cmd: test -x /usr/sbin/mysqld
+  register: mysql_present
+  changed_when: false
+  failed_when: false
 
-  - name: MySQL | Restart
-    service: name=mysql state=restarted
-#    when: mysql_conf.changed
-    when: docker_test is not defined
-    become: yes
-    tags:
-      - mysql
+- name: MYSQL | Install (Debian-based systems)
+  when: ansible_os_family == "Debian"
+  block:
 
+    - name: MYSQL | Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 86400
+      become: true
+
+    - name: MYSQL | Install repository prerequisites
+      ansible.builtin.apt:
+        name:
+          - gnupg
+          - ca-certificates
+          - python3-debian
+        state: present
+      retries: 3
+      register: result
+      until: result is not failed
+      become: true
+
+    - name: MYSQL | Fetch MySQL signing key
+      ansible.builtin.get_url:
+        # 2025 variant = same key material as 2023, re-issued with a longer
+        # expiry (the 2023 key file expired 2025-10-22 and apt rejects it).
+        url: https://repo.mysql.com/RPM-GPG-KEY-mysql-2025
+        dest: /tmp/mysql_signing.key
+        mode: "0644"
+        force: true
+      retries: 3
+      register: result
+      until: result is not failed
+      become: true
+
+    - name: MYSQL | Dearmor MySQL signing key into keyring
+      ansible.builtin.command:
+        cmd: gpg --dearmor -o /usr/share/keyrings/mysql-archive-keyring.gpg /tmp/mysql_signing.key
+        creates: /usr/share/keyrings/mysql-archive-keyring.gpg
+      become: true
+
+    - name: MYSQL | Add repo.mysql.com apt repository
+      ansible.builtin.deb822_repository:
+        name: mysql
+        types:
+          - deb
+        uris:
+          - "https://repo.mysql.com/apt/{{ ansible_distribution | lower }}"
+        suites:
+          - "{{ ansible_distribution_release }}"
+        components:
+          - "{{ mysql_apt_component }}"
+          - mysql-tools
+        signed_by: /usr/share/keyrings/mysql-archive-keyring.gpg
+        state: present
+        enabled: true
+      register: mysql_repo_added
+      become: true
+
+    - name: MYSQL | Prefer repo.mysql.com packages over distribution packages
+      ansible.builtin.copy:
+        dest: /etc/apt/preferences.d/99-mysql
+        content: |
+          Package: *
+          Pin: origin repo.mysql.com
+          Pin-Priority: 900
+        mode: "0644"
+      become: true
+
+    # Preseed only on fresh installs: Oracle's postinst clears the
+    # debconf values after consuming them, so a re-run against an
+    # installed server would always report a (fatal) mismatch.
+    - name: MYSQL | Preseed root password
+      ansible.builtin.debconf:
+        name: mysql-community-server
+        setting: "{{ item }}"
+        value: "{{ mysql_root_password }}"
+        vtype: password
+      no_log: true
+      when: mysql_present.rc != 0
+      become: true
+      loop:
+        - mysql-community-server/root-pass
+        - mysql-community-server/re-root-pass
+
+    - name: MYSQL | Install server
+      ansible.builtin.apt:
+        name: "{{ ['mysql-server=' ~ mysql_release ~ '*',
+                   'libmysqlclient-dev=' ~ mysql_release ~ '*']
+                  if mysql_version_pinned | bool
+                  else ['mysql-server', 'libmysqlclient-dev'] }}"
+        state: "{{ 'present' if mysql_version_pinned | bool else mysql_state }}"
+        update_cache: true
+        # Force a real refresh right after the repository was added; on
+        # re-runs the cache is reused so the task stays idempotent.
+        cache_valid_time: "{{ 0 if mysql_repo_added is changed else 86400 }}"
+      retries: 3
+      register: result
+      until: result is not failed
+      become: true
+      notify: MySQL | Restart mysql
+
+- name: MYSQL | Install (EL 8/9/10 systems)
+  when: ansible_os_family == "RedHat"
+  block:
+
+    - name: MYSQL | Install repository prerequisites
+      ansible.builtin.package:
+        name:
+          - gnupg2
+          - ca-certificates
+        state: present
+      retries: 3
+      register: result
+      until: result is not failed
+      become: true
+
+    - name: MYSQL | Install EPEL repository if absent
+      # grc (console colorizer) lives in EPEL on EL. PyMySQL does NOT -
+      # it ships in AppStream as python3-PyMySQL.
+      ansible.builtin.package:
+        name: epel-release
+        state: present
+      when: ansible_distribution in ['RedHat', 'Rocky', 'AlmaLinux']
+      failed_when: false
+      register: mysql_epel_install
+      become: true
+
+    - name: MYSQL | Fetch MySQL signing key
+      ansible.builtin.get_url:
+        url: https://repo.mysql.com/RPM-GPG-KEY-mysql-2025
+        dest: /tmp/mysql_signing.key
+        mode: "0644"
+        force: true
+      retries: 3
+      register: result
+      until: result is not failed
+      become: true
+
+    - name: MYSQL | Ensure keyring directory exists
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: MYSQL | Dearmor MySQL signing key into keyring
+      ansible.builtin.command:
+        cmd: gpg --dearmor -o /usr/share/keyrings/mysql-archive-keyring.gpg /tmp/mysql_signing.key
+        creates: /usr/share/keyrings/mysql-archive-keyring.gpg
+      become: true
+
+    - name: MYSQL | Add repo.mysql.com yum repository
+      ansible.builtin.yum_repository:
+        name: mysql
+        description: repo.mysql.com MySQL {{ mysql_target_series }} ({{ mysql_resolved_yum_repo }})
+        baseurl: "https://repo.mysql.com/yum/{{ mysql_resolved_yum_repo }}/el/{{ ansible_distribution_major_version }}/$basearch/"
+        gpgkey: "https://repo.mysql.com/RPM-GPG-KEY-mysql-2025"
+        gpgcheck: true
+        enabled: true
+      register: mysql_repo_added
+      become: true
+
+    - name: MYSQL | Install server
+      ansible.builtin.package:
+        name: "{{ ['mysql-community-server-' ~ mysql_release ~ '*', 'mysql-community-devel-' ~ mysql_release ~ '*']
+                  if mysql_version_pinned | bool
+                  else ['mysql-community-server', 'mysql-community-devel'] }}"
+        state: "{{ 'present' if mysql_version_pinned | bool else mysql_state }}"
+      retries: 3
+      register: result
+      until: result is not failed
+      become: true
+      notify: MySQL | Restart mysql
+
+- name: MYSQL | Install PyMySQL driver
+  ansible.builtin.package:
+    # EL AppStream names it python3-PyMySQL; Debian/Ubuntu use lowercase.
+    name: "{{ 'python3-PyMySQL' if ansible_os_family == 'RedHat' else 'python3-pymysql' }}"
+    state: present
+  retries: 3
+  register: result
+  until: result is not failed
+  become: true
+
+- name: MYSQL | Ensure service is running
+  ansible.builtin.service:
+    name: "{{ 'mysqld' if ansible_os_family == 'RedHat' else 'mysql' }}"
+    state: started
+    enabled: true
+  become: true
+  when: docker_test is not defined
+
+# EL packages have no debconf preseed: mysqld writes a random root
+# password to /var/log/mysqld.log during its first-start init, which
+# only happens once the service runs - hence this block sits AFTER
+# the service-start task. Replace it with the configured password on
+# fresh installs only.
+- name: MYSQL | Set root password (EL, fresh install)
+  when:
+    - ansible_os_family == "RedHat"
+    - mysql_present.rc != 0
+  block:
+    - name: MYSQL | Retrieve temporary root password
+      # shell (not command): the grep|awk pipeline needs a shell.
+      # become: /var/log/mysqld.log is mysql:mysql 0640.
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        grep "temporary password" /var/log/mysqld.log
+        | awk '{print $NF}' | tail -1
+      register: mysql_temp_password
+      changed_when: false
+      failed_when: false
+      no_log: true
+      become: true
+
+    - name: MYSQL | Alter root password to configured value
+      # env var, not -p inline: the generated temp password can contain
+      # any shell-hostile characters; MYSQL_PWD avoids all quoting issues.
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        export MYSQL_PWD='{{ mysql_temp_password.stdout }}';
+        mysql -u root --connect-expired-password
+        -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_root_password }}';"
+      when: mysql_temp_password.stdout | length > 0
+      changed_when: false
+      no_log: true
+      become: true
+
+    - name: MYSQL | Flush privileges after password change
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        export MYSQL_PWD='{{ mysql_root_password }}';
+        mysql -u {{ mysql_root_user }} -e "FLUSH PRIVILEGES;"
+      changed_when: false
+      failed_when: false
+      no_log: true
+      become: true
+
+- name: MYSQL | Render mysqld settings drop-in
+  ansible.builtin.template:
+    src: mysql/99-sa-mysql.cnf.j2
+    dest: "{{ '/etc/my.cnf.d/99-sa-mysql.cnf' if ansible_os_family == 'RedHat'
+              else '/etc/mysql/mysql.conf.d/99-sa-mysql.cnf' }}"
+    mode: "0644"
+  when: mysql_mysqld_settings | length > 0
+  become: true
+  notify: MySQL | Restart mysql
+
+- name: MYSQL | Write root client credentials
+  ansible.builtin.template:
+    src: root/my.cnf.j2
+    dest: /root/.my.cnf
+    mode: "0600"
+  no_log: true
+  become: true

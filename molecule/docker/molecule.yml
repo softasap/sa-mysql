@@ -1,0 +1,70 @@
+---
+# CI scenario (GitHub runners have no KVM): geerlingguy systemd images,
+# both LTS families on both Ubuntu releases.
+dependency:
+  name: galaxy
+driver:
+  name: docker
+# NOTE: rocky9 (geerlingguy/docker-rockylinux9-ansible) is deliberately
+# NOT tested here: the image's sudo PAM account stage fails inside a
+# container (nsswitch sss + no sssd -> "Authentication service cannot
+# retrieve authentication info"), which breaks ansible before the role
+# runs. EL is covered by the libvirt default scenario instead.
+platforms:
+  - name: ubuntu2404-mysql84
+    image: "geerlingguy/docker-ubuntu2404-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+  - name: ubuntu2404-mysql97
+    image: "geerlingguy/docker-ubuntu2404-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+  - name: ubuntu2604-mysql84
+    image: "geerlingguy/docker-ubuntu2604-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+  - name: ubuntu2604-mysql97
+    image: "geerlingguy/docker-ubuntu2604-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+provisioner:
+  name: ansible
+  log: true
+  inventory:
+    host_vars:
+      ubuntu2404-mysql84:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "8"
+        mysql_expected_series: "8.4"
+      ubuntu2404-mysql97:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "9"
+        mysql_expected_series: "9.7"
+      ubuntu2604-mysql84:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "8"
+        mysql_expected_series: "8.4"
+      ubuntu2604-mysql97:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "9"
+        mysql_expected_series: "9.7"
+verifier:
+  name: ansible
+scenario:
+  name: docker

@@ -1,0 +1,78 @@
+---
+# Verifies MySQL is really installed, the service is up, root login
+# with the preseeded password works, and the server reports the
+# expected LTS series (host var mysql_expected_series, set per platform
+# in molecule.yml).
+- name: Verify MySQL installation
+  hosts: all
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Verify | MySQL server package is installed
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Verify | Assert mysql-community-server present
+      ansible.builtin.assert:
+        that:
+          - "'mysql-community-server' in ansible_facts.packages"
+        fail_msg: "mysql-community-server is not installed"
+        success_msg: "mysql-community-server is installed"
+
+    - name: Verify | Collect service facts
+      ansible.builtin.service_facts:
+
+    - name: Verify | Assert mysql service running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['mysql.service'].state == 'running'
+        fail_msg: "mysql service is not running"
+        success_msg: "mysql service is running"
+      when: ansible_facts.services['mysql.service'] is defined
+
+    - name: Verify | Query server version with root credentials
+      ansible.builtin.command:
+        cmd: mysql --defaults-file=/root/.my.cnf -N -B -e "SELECT VERSION();"
+      register: mysql_version_query
+      changed_when: false
+
+    - name: Verify | Assert reported version is expected LTS series
+      ansible.builtin.assert:
+        that:
+          - mysql_version_query.stdout.startswith(mysql_expected_series)
+        fail_msg: >-
+          Expected MySQL {{ mysql_expected_series }} LTS, server reports:
+          {{ mysql_version_query.stdout }}
+        success_msg: "Server reports {{ mysql_version_query.stdout }}"
+
+    - name: Verify | Assert anonymous users are gone
+      ansible.builtin.command:
+        cmd: mysql --defaults-file=/root/.my.cnf -N -B -e "SELECT COUNT(*) FROM mysql.user WHERE User='';"
+      register: mysql_anonymous_count
+      changed_when: false
+
+    - name: Verify | Assert no anonymous accounts
+      ansible.builtin.assert:
+        that:
+          - mysql_anonymous_count.stdout | int == 0
+        fail_msg: "Anonymous MySQL accounts remain"
+        success_msg: "No anonymous MySQL accounts"
+
+    - name: Verify | Connect to app database with app credentials
+      ansible.builtin.command:
+        cmd: >-
+          mysql -u app -p'App#2026' -h localhost -N -B -e
+          "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='app';"
+      register: mysql_app_login
+      changed_when: false
+
+    - name: Verify | Assert app user can use the app database
+      ansible.builtin.assert:
+        that:
+          - mysql_app_login.rc == 0
+        fail_msg: "app@app login or USE app failed"
+        success_msg: "app user connects to app database"
+
+    - name: Verify | Report installed MySQL version
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: MySQL {{ mysql_version_query.stdout }} (expected {{ mysql_expected_series }} LTS)"
