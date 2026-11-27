@@ -1,94 +1,39 @@
 ---
-  - name: Check mysql config
-    command: test -e /usr/bin/mysql_config
-    ignore_errors: true
-    changed_when: False
-    register: mysql_config_exists
+# Manages databases and users via community.mysql modules.
+# Requires PyMySQL on the target (installed in tasks_mysql.yml)
+# and the community.mysql/ansible.mysql collection on the controller.
 
-# todo
-#  - name: Install libmariadbclient-dev
-#    apt: name="libmariadbclient-dev" state="present"
-#    retries: 3
-#    register: result
-#    until: not result is failed
-#    become: yes
-#    when: mysql_config_exists is failed
-#
-#  - name: link  /usr/bin/mariadb_config to /usr/bin/mysql_config
-#    file:
-#      src: /usr/bin/mariadb_config
-#      dest: /usr/bin/mysql_config
-#      state: link
-#    become: yes
-#    when: mysql_config_exists is failed
+- name: MYSQL | Create databases
+  ansible.mysql.mysql_db:
+    name: "{{ item.name }}"
+    collation: "{{ item.collation | default('utf8mb4_general_ci') }}"
+    encoding: "{{ item.encoding | default('utf8mb4') }}"
+    state: present
+    login_host: "{{ mysql_host | default('localhost') }}"
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  with_items: "{{ mysql_databases }}"
+  no_log: true
 
-  - name: Install libmysqlclient-dev
-    apt: name="libmysqlclient-dev" state="present"
-    retries: 3
-    register: result
-    until: not result is failed
-    become: yes
-    when: mysql_config_exists is failed
-
-  - name: For troubleshouting, output ansible_python_version
-    debug: var="ansible_python_version"
-
-  - name: Install setup tools(2)
-    package:
-       name:
-         - python-setuptools
-         - python-pip
-       state: present
-    when: ansible_python_version is version_compare('3','<')
-    become: yes
-    tags:
-      - mysql
-
-  - name: Install setup tools(3)
-    package:
-       name:
-         - python3-setuptools
-         - python3-pip
-       state: present
-    when: ansible_python_version is version_compare('3','>=')
-    become: yes
-    tags:
-      - mysql
-
-  - name: Configuration | install python mysql connector
-    pip: name=pymysql state=present
-    retries: 3
-    register: result
-    until: not result is failed
-    become: yes
-    tags:
-      - mysql
-
-  - name: Configuration | Create databases
-    mysql_db:
-      name: "{{ item.name }}"
-      collation: "{{ item.collation | default('utf8_general_ci') }}"
-      encoding: "{{ item.encoding | default('utf8') }}"
-      state: present
-      login_host: "{{ mysql_host | default('localhost') }}"
-      login_user: "{{ mysql_root_user | default('root') }}"
-      login_password: "{{ mysql_root_password | default('devroot') }}"
-    with_items: "{{ mysql_databases | default([]) }}"
-    tags:
-      - mysql
-
-  - name: Configuration | Create users
-    mysql_user:
-      name: "{{ item.name }}"
-      host: "{{ item.host | default('localhost') }}"
-      password: "{{ item.password }}"
-      priv: "{{ item.priv | default('*.*:USAGE') }}"
-      state: "{{ item.state | default('present') }}"
-      append_privs: "{{ item.append_privs | default('no') }}"
-      login_host: "{{ mysql_host | default('localhost') }}"
-      login_user: "{{ mysql_root_user | default('root') }}"
-      login_password: "{{ mysql_root_password | default('devroot') }}"
-    with_items: "{{ mysql_users | default([]) }}"
-    no_log: true
-    tags:
-      - mysql
+- name: MYSQL | Create users
+  ansible.mysql.mysql_user:
+    name: "{{ item.name }}"
+    host: "{{ item.host | default('localhost') }}"
+    # plugin_auth_string (not password) keeps the module on the
+    # "IDENTIFIED WITH <plugin> BY <pw>" code path: mysql_native_password
+    # is disabled in MySQL 8.4 and removed in 9.x, and the module's
+    # plain-password branch still hardcodes it (gated < 9.7 upstream).
+    plugin: "{{ item.plugin | default('caching_sha2_password') }}"
+    plugin_auth_string: "{{ item.password }}"
+    # on_create: caching_sha2_password re-salts on every comparison, so
+    # re-running with the same plaintext always "changes" - set the
+    # password only when the account is created; re-runs manage privs.
+    update_password: "{{ item.update_password | default('on_create') }}"
+    priv: "{{ item.priv | default('*.*:USAGE') }}"
+    state: "{{ item.state | default('present') }}"
+    append_privs: "{{ item.append_privs | default(false) }}"
+    login_host: "{{ mysql_host | default('localhost') }}"
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  with_items: "{{ mysql_users }}"
+  no_log: true

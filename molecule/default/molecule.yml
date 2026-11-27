@@ -1,44 +1,147 @@
 ---
-dependency:
-  name: galaxy
+# libvirt (KVM/QEMU) acceptance matrix: every supported OS x both LTS
+# families (8 -> 8.4 LTS, 9 -> 9.7 LTS from repo.mysql.com).
+# Run: MOLECULE_TEST_ROLE=sa-mysql poetry run molecule test -s default
+role_name_check: 1
 driver:
   name: vagrant
   provider:
-    name: virtualbox
-# lint:
-#   name: yamllint
+    name: libvirt
+  provision: false
+  cachier: machine
+  parallel: false
+  default_box: 'cloud-image/ubuntu-24.04'
 platforms:
-  # - name: trusty
-  #   box: ubuntu/trusty64
-  #   # interfaces:
-  #   #   - network_name: public_network
-  #   #     type: dhcp
-  #   #     auto_config: true    
-  - name: xenial
-    box: ubuntu/xenial64
-  #- name: bionic
-  #  box: ubuntu/bionic64
-    # interfaces:
-    #   - network_name: public_network
-    #     type: dhcp
-    #     auto_config: true
-  # - name: centos6
-  #   box: centos/6    
-  #- name: centos7
-  #  box: centos/7
-  # - name: fedora28
-  #   box: generic/fedora28
-  # - name: alpine
-  #   box: generic/alpine28
+  - name: ubuntu2204-mysql84
+    box: cloud-image/ubuntu-22.04
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: ubuntu2204-mysql97
+    box: cloud-image/ubuntu-22.04
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: ubuntu2404-mysql84
+    box: cloud-image/ubuntu-24.04
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: ubuntu2404-mysql97
+    box: cloud-image/ubuntu-24.04
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: debian12-mysql84
+    box: debian/bookworm64
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: debian12-mysql97
+    box: debian/bookworm64
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: debian13-mysql84
+    box: debian/trixie64
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: debian13-mysql97
+    box: debian/trixie64
+    memory: 1536
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: rocky9-mysql84
+    box: generic/rocky9
+    memory: 2048
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
+  - name: rocky9-mysql97
+    box: generic/rocky9
+    memory: 2048
+    cpus: 2
+    interfaces:
+      - network_name: private_network
+        type: dhcp
+        auto_config: true
 
-    
 provisioner:
   name: ansible
-  # lint:
-  #   name: ansible-lint
-scenario:
-  name: default
-verifier:
-  name: testinfra
-  lint:
-    name: flake8
+  log: true
+  scenario:
+    name: default
+  inventory:
+    host_vars:
+      ubuntu2204-mysql84:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "8"
+        mysql_expected_series: "8.4"
+      ubuntu2204-mysql97:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "9"
+        mysql_expected_series: "9.7"
+      ubuntu2404-mysql84:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "8"
+        mysql_expected_series: "8.4"
+      ubuntu2404-mysql97:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "9"
+        mysql_expected_series: "9.7"
+      debian12-mysql84:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "8"
+        mysql_expected_series: "8.4"
+      debian12-mysql97:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "9"
+        mysql_expected_series: "9.7"
+      debian13-mysql84:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "8"
+        mysql_expected_series: "8.4"
+      debian13-mysql97:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "9"
+        mysql_expected_series: "9.7"
+      rocky9-mysql84:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "8"
+        mysql_expected_series: "8.4"
+      rocky9-mysql97:
+        role_under_test: ${MOLECULE_TEST_ROLE:-role_under_test}
+        mysql_lts_family: "9"
+        mysql_expected_series: "9.7"
+  config_options:
+    defaults:
+      allow_world_readable_tmpfiles: true
+      callback_whitelist: profile_roles,profile_tasks,timer
+      ansible_python_interpreter: /usr/bin/python3

@@ -1,0 +1,5 @@
+# Managed by sa-mysql role - manual changes will be overwritten.
+[mysqld]
+{% for key, value in mysql_mysqld_settings.items() %}
+{{ key }} = {{ value }}
+{% endfor %}

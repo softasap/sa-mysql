@@ -1,0 +1,12 @@
+collections:
+  - name: community.general
+    version: 10.5.0
+  - name: ansible.posix
+    version: 1.6.2
+  # community.mysql is now a redirect shim to ansible.mysql (renamed
+  # upstream). 5.2.1 fixes "Plugin 'mysql_native_password' is not
+  # loaded" on MySQL 8.4/9.7 (native password removed server-side).
+  - name: ansible.mysql
+    version: 5.2.1
+  - name: community.mysql
+    version: 5.0.2

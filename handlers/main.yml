@@ -1,7 +1,10 @@
 ---
 # handlers file for sa-mysql
-  - name: restart mysql
-    service: name=mysql state=restarted
-    become: yes
-    when: docker_test is not defined
 
+- name: MySQL | Restart mysql
+  ansible.builtin.service:
+    # EL names the unit mysqld; Debian/Ubuntu mysql.
+    name: "{{ 'mysqld' if ansible_os_family == 'RedHat' else 'mysql' }}"
+    state: restarted
+  become: true
+  when: docker_test is not defined

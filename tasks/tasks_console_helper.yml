@@ -1,18 +1,31 @@
 ---
+# Console helper for the ansible (remote) user: grc colorizer config
+# and a personal .my.cnf pointing at the root credentials.
 
-  - name: Mysql | Install colorer grc
-    package: name="grc" state="present"
-    retries: 3
-    register: result
-    until: not result is failed
-    become: yes
-    tags: mysql
+- name: MYSQL | Install colorer grc
+  ansible.builtin.package:
+    name: grc
+    state: present
+  retries: 3
+  register: result
+  until: result is not failed
+  # EPEL is installed by tasks_mysql.yml on EL; still tolerate absence
+  # elsewhere instead of failing the run.
+  failed_when: false
+  become: true
 
-  - name: Mysql | Template colorer to current user
-    template: src="{{ role_dir }}/templates/grcat.mysql" dest="~/grcat.mysql"
-    tags: mysql
+- name: MYSQL | Template colorer to current user
+  ansible.builtin.template:
+    src: grcat.mysql.j2
+    dest: ~/grcat.mysql
+    mode: "0644"
 
-  - name: Mysql | mysql.cnf to current user
-    template: src="{{ role_dir }}/templates/my.cnf.j2" dest="~/.my.cnf"
-    tags: mysql
-
+- name: MYSQL | my.cnf to current user
+  ansible.builtin.template:
+    src: my.cnf.j2
+    dest: ~/.my.cnf
+    mode: "0600"
+  # /root/.my.cnf is managed with root credentials in tasks_mysql.yml;
+  # skip when connected as root so the two templates do not clobber
+  # each other on every run (breaks molecule idempotence).
+  when: ansible_env.HOME != '/root'

@@ -1,10 +1,53 @@
 ---
 # defaults file for sa-mysql
 
-  role_dir: "{{ role_path }}"
+role_dir: "{{ role_path }}"
 
-  option_harden_mysql: true
+# MySQL release to install from repo.mysql.com:
+#   lts         - most recent LTS of `mysql_lts_family` (8 -> 8.4 LTS, 9 -> 9.7 LTS)
+#   innovation  - current innovation series
+#   "8.4"       - concrete series, always latest of that series
+#   "8.4.13"    - concrete version pin (apt version glob, e.g. 8.4.13*)
+# Overriding mysql_apt_component directly bypasses this resolution entirely.
+mysql_release: lts
+mysql_lts_family: "8"
 
-  mysql_root_user: root
-  mysql_root_password: devroot
+# repo.mysql.com apt component (Debian/Ubuntu). Derived from mysql_release;
+# set explicitly (e.g. "mysql-8.0" for the EOL 8.0 series) to override.
+# EL systems derive the yum repo name from the same series automatically.
+mysql_apt_component: "{{ mysql_resolved_component }}"
 
+# Package state for the mysql-server metapackage. `latest` tracks the most
+# recent version in the enabled series; a concrete mysql_release pin forces
+# state `present` with a version glob regardless of this setting.
+mysql_state: latest
+
+mysql_root_user: root
+# Default root password: "development root" - strong enough for the
+# validate_password MEDIUM policy Oracle ships enabled on EL
+# (upper+lower+digit+special, no dictionary words), and free of '#'
+# and ';' which MySQL option files (/root/.my.cnf) treat as comment
+# starters.
+mysql_root_password: Devroot1!
+
+# Run idempotent hardening (remove anonymous users, test database,
+# remote root) after install. Requires a running server - skipped when
+# docker_test is defined (containers have no systemd PID 1).
+option_harden_mysql: true
+
+# [mysqld] settings rendered into /etc/mysql/mysql.conf.d/99-sa-mysql.cnf
+mysql_mysqld_settings: {}
+#  max_connections: 200
+#  bind-address: 127.0.0.1
+
+mysql_databases: []
+#  - name: app_db
+#    encoding: utf8mb4
+#    collation: utf8mb4_general_ci
+
+mysql_users: []
+#  - name: app_user
+#    host: "%"
+#    password: secret
+#    priv: "app_db.*:ALL"
+#    plugin: caching_sha2_password  # auth plugin (default; 8.4+ dropped mysql_native_password)

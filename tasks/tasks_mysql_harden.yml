@@ -1,35 +1,63 @@
 ---
-  - name: MySQL Hardening | Install dependency
-    apt: pkg="expect" state="present"
-    retries: 3
-    register: result
-    until: not result is failed
-    become: yes
-    tags:
-      - mysql
+# Idempotent replacement for `mysql_secure_installation`:
+# removes anonymous users, remote root accounts and the test database.
+# Root password itself is preseeded via debconf at install time
+# (see tasks_mysql.yml).
 
-  - block:
-      - name: Template hardening script (1/2)
-        template:
-            src: "{{ role_dir }}/templates/harden/secure_mysql_bash.sh.j2"
-            dest: "~/secure_mysql_bash.sh"
-            mode: "0750"
-        tags:
-          - mysql
+- name: MYSQL | Harden | Collect insecure accounts
+  ansible.mysql.mysql_query:
+    query:
+      - SELECT User, Host FROM mysql.user WHERE User = ''
+      - SELECT User, Host FROM mysql.user WHERE User = '{{ mysql_root_user }}' AND Host NOT IN ('localhost', '127.0.0.1', '::1')
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  no_log: true
+  register: mysql_harden_accounts
+  changed_when: false
 
-      # - name: Template hardening script (2/2)
-      #   template: src="{{ role_dir }}/templates/harden/secure_mysql.expect.j2" dest="~/secure_mysql.expect"
-      #   tags:
-      #     - mysql
+- name: MYSQL | Harden | Remove anonymous users
+  ansible.mysql.mysql_query:
+    query: DELETE FROM mysql.user WHERE User = ''
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  no_log: true
+  when: mysql_harden_accounts.query_result[0] | length > 0
 
-      - name: execute hardening script (bash)
-        command: ~/secure_mysql_bash.sh
-        tags:
-          - mysql
+- name: MYSQL | Harden | Remove remote root accounts
+  ansible.mysql.mysql_query:
+    query: >-
+      DELETE FROM mysql.user
+      WHERE User = '{{ mysql_root_user }}'
+      AND Host NOT IN ('localhost', '127.0.0.1', '::1')
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  no_log: true
+  when: mysql_harden_accounts.query_result[1] | length > 0
 
-    always:
-      - name: Cleanup hardening scripts
-        file: path="{{ item }}" state="absent"
-        with_items:
-          - "~/secure_mysql_bash.sh"
-          - "~/secure_mysql.expect"
+- name: MYSQL | Harden | Check for test database
+  ansible.mysql.mysql_query:
+    query: SHOW DATABASES LIKE 'test'
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  no_log: true
+  register: mysql_harden_testdb
+  changed_when: false
+
+- name: MYSQL | Harden | Drop test database
+  ansible.mysql.mysql_query:
+    query: DROP DATABASE IF EXISTS test
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  no_log: true
+  when: mysql_harden_testdb.query_result[0] | length > 0
+
+- name: MYSQL | Harden | Flush privileges
+  ansible.mysql.mysql_query:
+    query: FLUSH PRIVILEGES
+    login_user: "{{ mysql_root_user }}"
+    login_password: "{{ mysql_root_password }}"
+  no_log: true
+  when: >-
+    mysql_harden_accounts.query_result[0] | length > 0
+    or mysql_harden_accounts.query_result[1] | length > 0
+    or mysql_harden_testdb.query_result[0] | length > 0

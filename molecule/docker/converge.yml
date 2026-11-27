@@ -1,0 +1,26 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+
+  vars:
+    ansible_python_interpreter: auto
+
+  pre_tasks:
+    - name: Display role under test
+      ansible.builtin.debug:
+        var: role_under_test
+
+    - name: Display OS family
+      ansible.builtin.debug:
+        var: ansible_os_family
+
+  tasks:
+    - name: Apply role under test
+      ansible.builtin.include_role:
+        name: "{{ role_under_test | default('role_under_test') }}"
+      vars:
+        # geerlingguy images run systemd as PID 1: leave service
+        # management fully enabled (no docker_test) so the scenario
+        # exercises the same code path as real hosts.
+        preferred_python_version: "3"
